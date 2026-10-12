@@ -138,8 +138,7 @@ const Grid = (() => {
   return {
     // Scales the canvas to fit its parent, keeping aspect ratio.
     // Returns the factor between backing-store pixels and logical units.
-    fit(canvas, W, H) {
-      const stage = canvas.parentElement;
+    fit(canvas, W, H, stage = canvas.parentElement) {
       const cs = getComputedStyle(stage);
       const pw = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
       const ph = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
