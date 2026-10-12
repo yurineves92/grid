@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Light Cycles</title>
+<meta name="description" content="Light Cycles: arena de eliminação com motos de luz, para 1 ou 2 jogadores contra IA.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2302050b'/%3E%3Cpath d='M4 24H16V8H28' fill='none' stroke='%2300e5ff' stroke-width='4'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="game-page lc">
+<header class="topbar">
+  <a class="back" href="index.html">◄ GRID</a>
+  <h1>LIGHT CYCLES</h1>
+  <div class="hud" id="hud" aria-live="polite"></div>
+  <button class="icon-btn" id="muteBtn" type="button">🔊</button>
+</header>
+
+<main class="stage">
+  <canvas id="game" aria-label="Arena de Light Cycles"></canvas>
+
+  <div class="overlay" id="overlay">
+    <section class="panel" id="menuPanel">
+      <h2>LIGHT CYCLES</h2>
+      <p class="sub">Eliminação: quem bater em parede ou rastro é derezzado. O último programa de pé vence o round, e o primeiro a 3 rounds vence a partida.</p>
+
+      <div class="opt">
+        <span class="opt-label">MODO</span>
+        <div class="seg" data-setting="mode">
+          <button type="button" data-value="1p">1 JOGADOR</button>
+          <button type="button" data-value="2p">2 JOGADORES</button>
+        </div>
+      </div>
+      <div class="opt">
+        <span class="opt-label">OPONENTES IA</span>
+        <div class="seg" data-setting="ais">
+          <button type="button" data-value="0">0</button>
+          <button type="button" data-value="1">1</button>
+          <button type="button" data-value="2">2</button>
+          <button type="button" data-value="3">3</button>
+          <button type="button" data-value="4">4</button>
+          <button type="button" data-value="5">5</button>
+        </div>
+      </div>
+      <div class="opt">
+        <span class="opt-label">DIFICULDADE</span>
+        <div class="seg" data-setting="diff">
+          <button type="button" data-value="facil">FÁCIL</button>
+          <button type="button" data-value="normal">NORMAL</button>
+          <button type="button" data-value="dificil">DIFÍCIL</button>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-primary" type="button" data-action="start">ENTRAR NA GRADE</button>
+      </div>
+      <div class="keys" id="ctrlHelp"></div>
+    </section>
+
+    <section class="panel" id="pausePanel" hidden>
+      <h2>PAUSADO</h2>
+      <p class="sub">O sistema está aguardando, usuário.</p>
+      <div class="btn-row">
+        <button class="btn-primary" type="button" data-action="resume">CONTINUAR</button>
+        <button class="btn-ghost" type="button" data-action="menu">MENU</button>
+      </div>
+    </section>
+
+    <section class="panel" id="endPanel" hidden>
+      <h2 id="endTitle">FIM DE JOGO</h2>
+      <div id="endBody"></div>
+      <div class="btn-row">
+        <button class="btn-primary" type="button" data-action="start">REVANCHE</button>
+        <button class="btn-ghost" type="button" data-action="menu">MENU</button>
+      </div>
+    </section>
+  </div>
+
+  <button class="boost-btn touch-only" id="boostBtn" type="button">TURBO</button>
+</main>
+
+<script src="js/common.js"></script>
+<script src="js/lightcycles.js"></script>
+</body>
+</html>
