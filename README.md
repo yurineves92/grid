@@ -10,17 +10,21 @@ Sem build, sem dependências, sem servidor: é só publicar no GitHub Pages.
 
 ## Controles
 
+Os dois jogos mostram **joysticks virtuais na tela** (toque no celular, mouse no computador). O botão 🎮 no topo mostra/esconde os controles. Também funcionam com **controle de videogame** (Xbox, PlayStation etc. via USB/Bluetooth).
+
 **Light Cycles**
 - 1 jogador: setas ou WASD para virar, `Espaço` para turbo
 - 2 jogadores: P1 `WASD` + `Espaço`, P2 setas + `Enter`
+- Na tela: joystick para virar e botão TURBO (no modo 2 jogadores, um par de cada lado)
+- Controle: analógico/direcional vira, `A`/`RT` turbo, `Start` pausa (1º controle = P1, 2º = P2)
 - `P`/`Esc` pausa, `M` liga/desliga o som
-- Celular: deslize no campo para virar, segure o botão TURBO
 
 **Space Paranoids**
 - `WASD` ou setas: mover
 - Mouse: mirar, clique para atirar
 - Só teclado: `Q`/`E` giram a torre, `Espaço` atira
-- Celular: lado esquerdo da tela é o joystick, lado direito mira e atira
+- Na tela: joystick esquerdo move, joystick direito mira e atira, botão FOGO atira
+- Controle: analógico esquerdo move, direito mira e atira, `RT`/`A` atira, `Start` pausa
 
 ## Publicar no GitHub Pages
 

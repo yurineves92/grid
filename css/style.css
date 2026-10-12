@@ -168,12 +168,84 @@ button { font: inherit; color: inherit; cursor: pointer; }
   margin-left: auto; width: 38px; height: 32px;
   background: none; border: 1px solid var(--accent-dim); border-radius: 4px;
 }
+.icon-btn + .icon-btn { margin-left: 0; }
 .icon-btn:hover { border-color: var(--accent); }
+.icon-btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 10px var(--accent-dim); }
 
+/* Palco: [controles esq.] [jogo] [controles dir.]; em retrato os controles vão para baixo. */
 .stage {
   flex: 1; min-height: 0; position: relative;
-  display: flex; align-items: center; justify-content: center;
+  display: grid; gap: 12px; align-items: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "left game right";
   padding: 10px 16px;
+}
+.game-wrap {
+  grid-area: game; width: 100%; height: 100%; min-width: 0; min-height: 0;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.pad {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  user-select: none; -webkit-user-select: none; touch-action: none;
+}
+.pad-left { grid-area: left; }
+.pad-right { grid-area: right; }
+.pad [hidden], .no-pads .pad { display: none; }
+.pad-label { font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; color: var(--muted); text-align: center; }
+
+.vjoy {
+  --size: 136px;
+  position: relative; flex: none; width: var(--size); height: var(--size); border-radius: 50%;
+  border: 2px solid var(--accent); cursor: grab; touch-action: none;
+  background:
+    linear-gradient(var(--accent-dim), var(--accent-dim)) center / 2px 70% no-repeat,
+    linear-gradient(var(--accent-dim), var(--accent-dim)) center / 70% 2px no-repeat,
+    radial-gradient(circle, color-mix(in srgb, var(--accent) 14%, transparent), rgba(0, 0, 0, 0.5) 70%);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent),
+              inset 0 0 22px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.vjoy.active { cursor: grabbing; }
+.vjoy-knob {
+  position: absolute; left: 27%; top: 27%; width: 46%; height: 46%; border-radius: 50%;
+  pointer-events: none; transition: transform 0.12s ease-out;
+  background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--accent) 70%, #fff), color-mix(in srgb, var(--accent) 35%, #000));
+  border: 2px solid var(--accent); box-shadow: 0 0 16px var(--accent);
+}
+.vjoy.active .vjoy-knob { transition: none; }
+.pad-btn {
+  --c: var(--accent);
+  flex: none; width: 82px; height: 82px; border-radius: 50%;
+  border: 2px solid var(--c); color: var(--c);
+  background: radial-gradient(circle, color-mix(in srgb, var(--c) 18%, transparent), rgba(0, 0, 0, 0.5) 72%);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--c) 35%, transparent);
+  font-weight: 900; font-size: 12px; letter-spacing: 0.08em;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.pad-btn.active { background: color-mix(in srgb, var(--c) 45%, transparent); box-shadow: 0 0 26px var(--c); color: #fff; }
+
+@media (orientation: portrait) {
+  .stage {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "game game" "left right";
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+  }
+  .pad { flex-direction: row; }
+  .pad-left { justify-self: start; }
+  .pad-right { justify-self: end; }
+  .pad-left .pad-btn { order: 2; }
+  .pad-right .pad-btn { order: -1; }
+  .pad-label { display: none; }
+}
+@media (max-height: 520px) {
+  .vjoy { --size: 112px; }
+  .pad-btn { width: 66px; height: 66px; }
+  .pad { gap: 8px; }
+}
+@media (max-width: 380px) {
+  .vjoy { --size: 116px; }
+  .pad-btn { width: 66px; height: 66px; }
 }
 #game {
   display: block; background: #000; touch-action: none;
@@ -249,14 +321,6 @@ kbd {
 
 .touch-only { display: none; }
 @media (pointer: coarse) { .touch-only { display: block; } .no-touch { display: none; } }
-.boost-btn {
-  position: absolute; right: 26px; bottom: 26px; z-index: 1;
-  width: 86px; height: 86px; border-radius: 50%;
-  border: 2px solid var(--cyan); background: rgba(0, 229, 255, 0.12);
-  color: var(--cyan); font-weight: 900; font-size: 13px; letter-spacing: 0.1em;
-  touch-action: none; user-select: none; -webkit-user-select: none;
-}
-.boost-btn:active { background: rgba(0, 229, 255, 0.35); }
 
 @media (max-height: 520px) {
   .topbar { min-height: 0; padding: 4px 12px; }

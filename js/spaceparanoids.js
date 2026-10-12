@@ -56,6 +56,12 @@
   let spawnTimer = 0, shake = 0, time = 0, msg = null;
   let lastHud = '';
 
+  const stage = document.getElementById('stage');
+  const joyL = new VJoy(document.getElementById('joyL'));
+  const joyR = new VJoy(document.getElementById('joyR'));
+  const btnFire = Grid.holdButton(document.getElementById('btnFire'));
+  let prevStart = false;
+
   const keys = new Set();
   const mouse = { x: W / 2, y: H / 2, active: false, down: false };
   let joy = null, touchAim = null, manualAimT = 99;
@@ -450,6 +456,9 @@
       const dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = Math.hypot(dx, dy);
       if (d > 8) { const m = Math.min(1, d / 60); mx = dx / d * m; my = dy / d * m; }
     }
+    if (joyL.mag > 0.15) { mx = joyL.x; my = joyL.y; }
+    const g = Grid.gamepad(0);
+    if (g && (g.lx || g.ly)) { mx = g.lx; my = g.ly; }
     const len = Math.hypot(mx, my);
     if (len > 1) { mx /= len; my /= len; }
 
@@ -460,8 +469,16 @@
     }
     if (dt > 0) { p.vx = (p.x - ox) / dt; p.vy = (p.y - oy) / dt; }
 
-    let firing = keys.has('Space') || mouse.down;
-    if (touchAim) {
+    let firing = keys.has('Space') || mouse.down || btnFire.down || !!(g && (g.rt || g.rb || g.a));
+    const padAim = g && Math.hypot(g.rx, g.ry) > 0.35;
+    if (joyR.mag > 0.3 || padAim) {
+      // joystick de mira: aponta a torre e atira enquanto estiver inclinado
+      const ax = joyR.mag > 0.3 ? joyR.x : g.rx, ay = joyR.mag > 0.3 ? joyR.y : g.ry;
+      p.turret = rotateToward(p.turret, Math.atan2(ay, ax), 16 * dt);
+      if (Math.hypot(ax, ay) > 0.55) firing = true;
+      mouse.active = false;
+      manualAimT = 0;
+    } else if (touchAim) {
       p.turret = rotateToward(p.turret, Math.atan2(touchAim.y - p.y, touchAim.x - p.x), 14 * dt);
       firing = true;
     } else if (mouse.active) {
@@ -587,8 +604,19 @@
 
   /* ---------------- loop ---------------- */
 
+  function pollStart() {
+    const g = Grid.gamepad(0);
+    const start = !!(g && g.start);
+    if (start && !prevStart) {
+      if (state === 'menu' || state === 'gameover') { Sfx.ensure(); startGame(); }
+      else if (playing() || state === 'paused') togglePause();
+    }
+    prevStart = start;
+  }
+
   function update(dt) {
     time += dt;
+    pollStart();
     if (state === 'paused') return;
     shake = Math.max(0, shake - dt * 25);
     if (msg) { msg.t += dt; if (msg.t > msg.dur) msg = null; }
@@ -1021,8 +1049,9 @@
 
   /* ---------------- boot ---------------- */
 
-  function resize() { k = Grid.fit(canvas, W, H); buildBg(); }
+  function resize() { k = Grid.fit(canvas, W, H); if (map) buildBg(); }
   window.addEventListener('resize', resize);
+  Grid.setupPads(stage, document.getElementById('padBtn'), resize);
 
   let last = performance.now();
   function frame(now) {

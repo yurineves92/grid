@@ -41,7 +41,14 @@
   const ctrlHelp = document.getElementById('ctrlHelp');
   const endTitle = document.getElementById('endTitle');
   const endBody = document.getElementById('endBody');
-  const boostBtn = document.getElementById('boostBtn');
+  const stage = document.getElementById('stage');
+  const joyL = new VJoy(document.getElementById('joyL'));
+  const joyR = new VJoy(document.getElementById('joyR'));
+  const btnL = Grid.holdButton(document.getElementById('btnL'));
+  const btnR = Grid.holdButton(document.getElementById('btnR'));
+  const padRight = document.getElementById('padRight');
+  const labelL = document.getElementById('labelL');
+  const labelR = document.getElementById('labelR');
 
   const storedDiff = Grid.store.get('lc_diff', 'normal');
   const settings = {
@@ -66,6 +73,7 @@
   let shake = 0, time = 0;
   let hum = null;
   const boostKeys = { p1: false, p2: false };
+  const extraBoost = { p1: false, p2: false }; // joystick na tela / controle físico
 
   const idx = (x, y) => y * COLS + x;
   const free = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && !grid[y * COLS + x];
@@ -157,6 +165,7 @@
 
   function update(dt) {
     time += dt;
+    pollInputs();
     if (state === 'paused' || state === 'matchEnd') return;
     shake = Math.max(0, shake - dt * 30);
     updateParticles(dt);
@@ -200,7 +209,7 @@
     for (const b of order) {
       if (!b.alive) continue;
       let want;
-      if (b.human) want = boostKeys[b.human];
+      if (b.human) want = boostKeys[b.human] || extraBoost[b.human];
       else { b.aiBoostT -= dt; want = b.aiBoostT > 0; }
       const was = b.boosting;
       b.boosting = want && (was ? b.energy > 0 : b.energy > 0.15);
@@ -584,10 +593,24 @@
     ctrlHelp.innerHTML = settings.mode === '2p'
       ? `<div><b style="color:#00e5ff">P1</b>: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> virar · <kbd>Espaço</kbd> turbo</div>
          <div><b style="color:#ff8a00">P2</b>: <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> virar · <kbd>Enter</kbd> turbo</div>
-         <div><kbd>P</kbd>/<kbd>Esc</kbd> pausa · <kbd>M</kbd> som</div>`
+         <div><kbd>P</kbd>/<kbd>Esc</kbd> pausa · <kbd>M</kbd> som</div>
+         <div>Na tela: joystick e TURBO de cada lado (🎮 mostra/esconde). Controles físicos: 1º = P1, 2º = P2.</div>`
       : `<div><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> virar · <kbd>Espaço</kbd> turbo</div>
          <div><kbd>P</kbd>/<kbd>Esc</kbd> pausa · <kbd>M</kbd> som</div>
-         <div class="touch-only">Celular: deslize no campo para virar, segure TURBO para acelerar.</div>`;
+         <div>Na tela: joystick para virar e botão TURBO (🎮 mostra/esconde). Também dá pra deslizar o dedo no campo.</div>
+         <div>Controle de videogame: analógico/direcional vira, <kbd>A</kbd>/<kbd>RT</kbd> turbo, <kbd>Start</kbd> pausa.</div>`;
+    syncPads();
+  }
+
+  // Monta os controles na tela conforme o modo: 1P = joystick + TURBO; 2P = um par para cada jogador.
+  function syncPads() {
+    const two = settings.mode === '2p';
+    btnL.el.hidden = !two;
+    joyR.el.hidden = !two;
+    labelL.textContent = two ? 'P1' : 'DIREÇÃO';
+    labelR.textContent = two ? 'P2' : '';
+    padRight.style.setProperty('--accent', two ? RIDERS[1].color : '');
+    padRight.style.setProperty('--accent-dim', two ? 'rgba(255, 138, 0, 0.3)' : '');
   }
 
   function togglePause() {
@@ -693,16 +716,57 @@
   canvas.addEventListener('pointerup', endSwipe);
   canvas.addEventListener('pointercancel', endSwipe);
 
-  boostBtn.addEventListener('pointerdown', e => { e.preventDefault(); Sfx.ensure(); boostKeys.p1 = true; });
-  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) {
-    boostBtn.addEventListener(ev, () => { boostKeys.p1 = false; });
+  // Joysticks (na tela e físicos) viram a moto quando a direção dominante muda.
+  const stickPrev = {};
+  let prevStart = false;
+
+  function stickDir(x, y, prev) {
+    if (Math.hypot(x, y) < 0.45) return null;
+    const ax = Math.abs(x), ay = Math.abs(y);
+    let horiz;
+    if (prev === 1 || prev === 3) horiz = ax * 1.3 > ay;      // histerese evita zigue-zague na diagonal
+    else if (prev === 0 || prev === 2) horiz = ax > ay * 1.3;
+    else horiz = ax > ay;
+    return horiz ? (x > 0 ? 1 : 3) : (y > 0 ? 2 : 0);
   }
-  boostBtn.addEventListener('contextmenu', e => e.preventDefault());
+
+  function feedStick(src, h, x, y) {
+    const d = stickDir(x, y, stickPrev[src]);
+    if (d !== null && d !== stickPrev[src] && !attract && (state === 'countdown' || state === 'playing')) {
+      const b = bikeOf(h);
+      if (b && b.alive) queueDir(b, d);
+    }
+    stickPrev[src] = d;
+  }
+
+  function pollInputs() {
+    const two = settings.mode === '2p';
+    feedStick('joyL', 'p1', joyL.x, joyL.y);
+    if (two) feedStick('joyR', 'p2', joyR.x, joyR.y);
+    extraBoost.p1 = two ? btnL.down : btnR.down;
+    extraBoost.p2 = two && btnR.down;
+
+    let start = false;
+    for (let i = 0; i < (two ? 2 : 1); i++) {
+      const g = Grid.gamepad(i);
+      if (!g) continue;
+      const h = i === 0 ? 'p1' : 'p2';
+      feedStick('pad' + i, h, g.lx, g.ly);
+      if (g.a || g.rt || g.rb) extraBoost[h] = true;
+      start = start || g.start;
+    }
+    if (start && !prevStart) {
+      if (attract || state === 'matchEnd') { Sfx.ensure(); showPanel(null); newMatch(false); }
+      else togglePause();
+    }
+    prevStart = start;
+  }
 
   /* ---------------- boot ---------------- */
 
   function resize() { k = Grid.fit(canvas, W, H); buildBg(); }
   window.addEventListener('resize', resize);
+  Grid.setupPads(stage, document.getElementById('padBtn'), resize);
 
   let last = performance.now();
   function frame(now) {
@@ -714,7 +778,6 @@
   }
 
   Grid.bindMute(document.getElementById('muteBtn'));
-  resize();
   syncMenu();
   newMatch(true);
   showPanel('menu');

@@ -22,11 +22,23 @@
     <span>VIDAS<b id="hLives"></b></span>
     <span class="hud-status" id="hStatus"></span>
   </div>
+  <button class="icon-btn" id="padBtn" type="button" aria-label="Controles na tela">🎮</button>
   <button class="icon-btn" id="muteBtn" type="button">🔊</button>
 </header>
 
-<main class="stage">
-  <canvas id="game" aria-label="Arena de Space Paranoids"></canvas>
+<main class="stage" id="stage">
+  <div class="pad pad-left" style="--accent:#00e5ff;--accent-dim:rgba(0,229,255,.3)">
+    <div class="vjoy" id="joyL" aria-label="Joystick: mover"><div class="vjoy-knob"></div></div>
+    <span class="pad-label">MOVER</span>
+  </div>
+  <div class="game-wrap">
+    <canvas id="game" aria-label="Arena de Space Paranoids"></canvas>
+  </div>
+  <div class="pad pad-right">
+    <button class="pad-btn" id="btnFire" type="button">FOGO</button>
+    <div class="vjoy" id="joyR" aria-label="Joystick: mirar e atirar"><div class="vjoy-knob"></div></div>
+    <span class="pad-label">MIRA + TIRO</span>
+  </div>
 
   <div class="overlay" id="overlay">
     <section class="panel" id="menuPanel">
@@ -40,7 +52,8 @@
         <div class="no-touch">Mouse: mirar · clique: atirar</div>
         <div class="no-touch">Só teclado: <kbd>Q</kbd>/<kbd>E</kbd> giram a torre · <kbd>Espaço</kbd> atira</div>
         <div class="no-touch"><kbd>P</kbd>/<kbd>Esc</kbd> pausa · <kbd>M</kbd> som</div>
-        <div class="touch-only">Toque: lado esquerdo move (joystick), lado direito mira e atira.</div>
+        <div>Na tela (🎮 mostra/esconde): joystick esquerdo move, joystick direito mira e atira. FOGO atira para onde a torre aponta.</div>
+        <div>Controle de videogame: analógico esquerdo move, direito mira e atira, <kbd>RT</kbd>/<kbd>A</kbd> atira, <kbd>Start</kbd> pausa.</div>
         <div>Itens: <b style="color:#00e5ff">S</b> escudo · <b style="color:#ffe600">R</b> rajada · <b style="color:#39ff14">+</b> vida extra</div>
         <div>Seus tiros ricocheteiam uma vez nas paredes.</div>
       </div>

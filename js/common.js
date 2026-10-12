@@ -87,6 +87,44 @@ const Sfx = (() => {
   };
 })();
 
+// Joystick virtual na tela: arrastar com dedo ou mouse. x/y vão de -1 a 1.
+class VJoy {
+  constructor(el) {
+    this.el = el;
+    this.knob = el.querySelector('.vjoy-knob');
+    this.x = 0; this.y = 0; this.id = null;
+    el.addEventListener('pointerdown', e => {
+      if (this.id !== null) return;
+      Sfx.ensure();
+      this.id = e.pointerId;
+      el.classList.add('active');
+      this.move(e);
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (err) { /* ponteiro já liberado */ }
+    });
+    el.addEventListener('pointermove', e => { if (e.pointerId === this.id) this.move(e); });
+    const end = e => {
+      if (e.pointerId !== this.id) return;
+      this.id = null; this.x = 0; this.y = 0;
+      el.classList.remove('active');
+      this.knob.style.transform = '';
+    };
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(ev, end);
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  move(e) {
+    const r = this.el.getBoundingClientRect();
+    const R = r.width / 2;
+    let dx = (e.clientX - r.left - R) / R, dy = (e.clientY - r.top - R) / R;
+    const m = Math.hypot(dx, dy);
+    if (m > 1) { dx /= m; dy /= m; }
+    this.x = dx; this.y = dy;
+    this.knob.style.transform = `translate(${dx * R * 0.6}px, ${dy * R * 0.6}px)`;
+  }
+  get active() { return this.id !== null; }
+  get mag() { return Math.hypot(this.x, this.y); }
+}
+
 const Grid = (() => {
   const muteButtons = [];
 
@@ -127,6 +165,42 @@ const Grid = (() => {
       set(key, v) {
         try { localStorage.setItem(key, String(v)); } catch (e) { /* no storage */ }
       },
+    },
+    // Botão 🎮 que mostra/esconde os controles na tela (padrão: visível).
+    setupPads(stage, btn, onChange) {
+      let on = Grid.store.get('grid_pads', '1') === '1';
+      const apply = () => {
+        stage.classList.toggle('no-pads', !on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        btn.title = on ? 'Esconder controles na tela' : 'Mostrar controles na tela';
+        onChange();
+      };
+      btn.addEventListener('click', () => { on = !on; Grid.store.set('grid_pads', on ? '1' : '0'); apply(); btn.blur(); });
+      apply();
+    },
+    // Botão que conta enquanto está pressionado (toque ou mouse).
+    holdButton(el) {
+      const st = { el, down: false };
+      const up = () => { st.down = false; el.classList.remove('active'); };
+      el.addEventListener('pointerdown', e => {
+        e.preventDefault(); Sfx.ensure();
+        st.down = true; el.classList.add('active');
+        try { el.setPointerCapture(e.pointerId); } catch (err) { /* ponteiro já liberado */ }
+      });
+      for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(ev, up);
+      el.addEventListener('contextmenu', e => e.preventDefault());
+      return st;
+    },
+    // Controle físico (Gamepad API). i = 0 para o primeiro conectado, 1 para o segundo.
+    gamepad(i) {
+      const list = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+      const g = list[i];
+      if (!g) return null;
+      const ax = n => { const v = g.axes[n] || 0; return Math.abs(v) > 0.2 ? v : 0; };
+      const b = n => !!(g.buttons[n] && g.buttons[n].pressed);
+      let lx = ax(0), ly = ax(1);
+      if (b(14)) lx = -1; if (b(15)) lx = 1; if (b(12)) ly = -1; if (b(13)) ly = 1;
+      return { lx, ly, rx: ax(2), ry: ax(3), a: b(0), b: b(1), x: b(2), y: b(3), lb: b(4), rb: b(5), lt: b(6), rt: b(7), start: b(9) };
     },
     shuffle(a) {
       for (let i = a.length - 1; i > 0; i--) {

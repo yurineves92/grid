@@ -16,11 +16,24 @@
   <a class="back" href="index.html">◄ GRID</a>
   <h1>LIGHT CYCLES</h1>
   <div class="hud" id="hud" aria-live="polite"></div>
+  <button class="icon-btn" id="padBtn" type="button" aria-label="Controles na tela">🎮</button>
   <button class="icon-btn" id="muteBtn" type="button">🔊</button>
 </header>
 
-<main class="stage">
-  <canvas id="game" aria-label="Arena de Light Cycles"></canvas>
+<main class="stage" id="stage">
+  <div class="pad pad-left">
+    <button class="pad-btn" id="btnL" type="button">TURBO</button>
+    <div class="vjoy" id="joyL" aria-label="Joystick: direção"><div class="vjoy-knob"></div></div>
+    <span class="pad-label" id="labelL">DIREÇÃO</span>
+  </div>
+  <div class="game-wrap">
+    <canvas id="game" aria-label="Arena de Light Cycles"></canvas>
+  </div>
+  <div class="pad pad-right" id="padRight">
+    <button class="pad-btn" id="btnR" type="button">TURBO</button>
+    <div class="vjoy" id="joyR" aria-label="Joystick do jogador 2"><div class="vjoy-knob"></div></div>
+    <span class="pad-label" id="labelR"></span>
+  </div>
 
   <div class="overlay" id="overlay">
     <section class="panel" id="menuPanel">
@@ -78,8 +91,6 @@
       </div>
     </section>
   </div>
-
-  <button class="boost-btn touch-only" id="boostBtn" type="button">TURBO</button>
 </main>
 
 <script src="js/common.js"></script>
