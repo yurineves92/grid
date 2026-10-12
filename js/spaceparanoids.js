@@ -55,6 +55,30 @@
   let player, enemies = [], bullets = [], particles = [], pickups = [], pending = [];
   let spawnTimer = 0, shake = 0, time = 0, msg = null;
   let lastHud = '';
+  let lastDt = 1 / 60;
+
+  // Visual 3D (Three.js) ou 2D clássico; a lógica é a mesma nos dois.
+  const screenEl = document.getElementById('screen');
+  const gameWrap = document.getElementById('gameWrap');
+  const has3D = typeof SP3D !== 'undefined' && SP3D.supported();
+  const settings = {
+    view: Grid.store.get('sp_view', '3d') === '2d' ? '2d' : '3d',
+    cam: Grid.store.get('sp_cam', 'arena') === 'chase' ? 'chase' : 'arena',
+  };
+  let r3d = null;
+  if (has3D) {
+    try {
+      r3d = SP3D.create({
+        W, H, TILE, COLS, ROWS, wallColor: WALL_COLOR, mount: screenEl,
+        spawns: ENEMY_SPAWNS, playerSpawn: PLAYER_SPAWN,
+      });
+    } catch (err) {
+      console.warn('3D indisponível, usando 2D:', err);
+      r3d = null;
+    }
+  }
+  if (!r3d) settings.view = '2d';
+  const is3d = () => settings.view === '3d' && r3d !== null;
 
   const stage = document.getElementById('stage');
   const joyL = new VJoy(document.getElementById('joyL'));
@@ -225,6 +249,7 @@
     state = 'menu';
     map = genMap(3);
     buildBg();
+    if (r3d) { r3d.buildMap(map); r3d.resetCamera(); }
     player = makePlayer();
     player.alive = false;
     enemies = []; bullets = []; particles = []; pickups = []; pending = [];
@@ -245,6 +270,7 @@
   function startLevel() {
     map = genMap(level);
     buildBg();
+    if (r3d) { r3d.buildMap(map); r3d.resetCamera(); }
     player = makePlayer();
     enemies = []; bullets = []; particles = []; pickups = [];
     pending = buildWave(level);
@@ -462,8 +488,13 @@
     const len = Math.hypot(mx, my);
     if (len > 1) { mx /= len; my /= len; }
 
+    const chase = is3d() && settings.cam === 'chase';
     const ox = p.x, oy = p.y;
-    if (mx || my) {
+    if (chase) {
+      // câmera atrás do tanque: cima/baixo = frente/ré, esquerda/direita = girar
+      if (mx) p.angle += mx * 2.8 * dt;
+      if (my) moveCircle(p, Math.cos(p.angle) * -my * PLAYER_SPEED * dt, Math.sin(p.angle) * -my * PLAYER_SPEED * dt);
+    } else if (mx || my) {
       p.angle = rotateToward(p.angle, Math.atan2(my, mx), 10 * dt);
       moveCircle(p, mx * PLAYER_SPEED * dt, my * PLAYER_SPEED * dt);
     }
@@ -474,21 +505,27 @@
     if (joyR.mag > 0.3 || padAim) {
       // joystick de mira: aponta a torre e atira enquanto estiver inclinado
       const ax = joyR.mag > 0.3 ? joyR.x : g.rx, ay = joyR.mag > 0.3 ? joyR.y : g.ry;
-      p.turret = rotateToward(p.turret, Math.atan2(ay, ax), 16 * dt);
+      const aimA = chase ? p.angle + Math.atan2(ax, -ay) : Math.atan2(ay, ax);
+      p.turret = rotateToward(p.turret, aimA, 16 * dt);
       if (Math.hypot(ax, ay) > 0.55) firing = true;
       mouse.active = false;
       manualAimT = 0;
     } else if (touchAim) {
-      p.turret = rotateToward(p.turret, Math.atan2(touchAim.y - p.y, touchAim.x - p.x), 14 * dt);
+      const ta = aimAt(touchAim);
+      p.turret = rotateToward(p.turret, Math.atan2(ta.y - p.y, ta.x - p.x), 14 * dt);
       firing = true;
     } else if (mouse.active) {
-      p.turret = Math.atan2(mouse.y - p.y, mouse.x - p.x);
+      const m = aimAt(mouse);
+      p.turret = Math.atan2(m.y - p.y, m.x - p.x);
     } else {
       const q = keys.has('KeyQ'), e = keys.has('KeyE');
       if (q) { p.turret -= 3.6 * dt; manualAimT = 0; }
       if (e) { p.turret += 3.6 * dt; manualAimT = 0; }
       manualAimT += dt;
-      if (!q && !e && manualAimT > 1.2 && (mx || my)) p.turret = rotateToward(p.turret, Math.atan2(my, mx), 7 * dt);
+      if (!q && !e && manualAimT > 1.2) {
+        if (chase) p.turret = rotateToward(p.turret, p.angle, 7 * dt);
+        else if (mx || my) p.turret = rotateToward(p.turret, Math.atan2(my, mx), 7 * dt);
+      }
     }
 
     if (firing && p.fireCd <= 0) {
@@ -588,7 +625,10 @@
     for (let i = 0; i < n; i++) {
       const a = Math.random() * TAU, s = speed * (0.2 + Math.random() * 0.8);
       const life = 0.3 + Math.random() * 0.7;
-      particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color, len: 2 + Math.random() * 5 });
+      particles.push({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color, len: 2 + Math.random() * 5,
+        h: 6 + Math.random() * 12, vh: Math.random() * speed * 0.7,
+      });
     }
   }
 
@@ -597,6 +637,8 @@
     for (const q of particles) {
       q.x += q.vx * dt; q.y += q.vy * dt;
       q.vx *= drag; q.vy *= drag;
+      q.h += q.vh * dt; q.vh -= 420 * dt;
+      if (q.h < 0) { q.h = 0; q.vh *= -0.35; }
       q.life -= dt;
     }
     particles = particles.filter(q => q.life > 0);
@@ -604,8 +646,12 @@
 
   /* ---------------- loop ---------------- */
 
+  let prevY = false;
   function pollStart() {
     const g = Grid.gamepad(0);
+    const y = !!(g && g.y);
+    if (y && !prevY) toggleCam();
+    prevY = y;
     const start = !!(g && g.start);
     if (start && !prevStart) {
       if (state === 'menu' || state === 'gameover') { Sfx.ensure(); startGame(); }
@@ -918,12 +964,65 @@
       ctx.save();
       ctx.strokeStyle = 'rgba(255,138,0,0.7)';
       ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(touchAim.x, touchAim.y, 18, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(touchAim.sx, touchAim.sy, 18, 0, TAU); ctx.stroke();
       ctx.restore();
     }
   }
 
+  // Mini-mapa no canto: em 3D a câmera não mostra a arena inteira.
+  function drawRadar() {
+    const s = 0.17, rw = W * s, rh = H * s, x0 = W - rw - 12, y0 = 12;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 6, 14, 0.72)';
+    ctx.fillRect(x0, y0, rw, rh);
+    ctx.fillStyle = 'rgba(47, 168, 255, 0.4)';
+    for (let ty = 0; ty < ROWS; ty++) {
+      for (let tx = 0; tx < COLS; tx++) {
+        if (map[ty * COLS + tx] === 1) ctx.fillRect(x0 + tx * TILE * s, y0 + ty * TILE * s, TILE * s + 0.5, TILE * s + 0.5);
+      }
+    }
+    for (const u of pickups) {
+      ctx.fillStyle = PICKUPS[u.type].color;
+      ctx.fillRect(x0 + u.x * s - 2, y0 + u.y * s - 2, 4, 4);
+    }
+    for (const e of enemies) {
+      ctx.globalAlpha = e.spawnT > 0 ? 0.4 : 1;
+      ctx.fillStyle = ETYPES[e.type].color;
+      const r = e.type === 'rec' ? 4 : 2.5;
+      ctx.fillRect(x0 + e.x * s - r, y0 + e.y * s - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1;
+    if (player.alive) {
+      ctx.save();
+      ctx.translate(x0 + player.x * s, y0 + player.y * s);
+      ctx.rotate(player.angle);
+      ctx.fillStyle = PLAYER_COLOR;
+      ctx.shadowColor = PLAYER_COLOR;
+      ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(-3.5, -3.5); ctx.lineTo(-3.5, 3.5); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x0 + 0.5, y0 + 0.5, rw, rh);
+    ctx.restore();
+  }
+
   function render() {
+    if (is3d()) {
+      r3d.render({
+        mode: state === 'menu' ? 'menu' : 'game', cam: settings.cam,
+        player, enemies, bullets, pickups, particles, time, dt: lastDt, shake,
+        etypes: ETYPES, pickupTypes: PICKUPS, playerColor: PLAYER_COLOR,
+      });
+      // o canvas 2D vira uma camada transparente só com textos, radar e controles
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+      if (state !== 'menu') drawRadar();
+      drawUi();
+      return;
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(bg, 0, 0);
     const sx = shake ? (Math.random() - 0.5) * shake : 0;
@@ -992,6 +1091,40 @@
     }
   });
 
+  function syncOptions() {
+    if (!r3d) settings.view = '2d';
+    panels.menu.querySelectorAll('.seg').forEach(seg => {
+      const key = seg.dataset.setting;
+      seg.querySelectorAll('button').forEach(b => {
+        const on = b.dataset.value === settings[key];
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        if (key === 'view' && b.dataset.value === '3d') b.disabled = !r3d;
+      });
+    });
+    document.getElementById('camOpt').hidden = settings.view !== '3d';
+    document.getElementById('no3d').hidden = !!r3d;
+    Grid.store.set('sp_view', settings.view);
+    Grid.store.set('sp_cam', settings.cam);
+    screenEl.classList.toggle('is3d', is3d());
+    if (r3d) { r3d.setVisible(is3d()); r3d.resetCamera(); }
+  }
+
+  function toggleCam() {
+    if (!is3d()) return;
+    settings.cam = settings.cam === 'chase' ? 'arena' : 'chase';
+    syncOptions();
+  }
+
+  panels.menu.querySelectorAll('.seg').forEach(seg => {
+    seg.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b || b.disabled) return;
+      settings[seg.dataset.setting] = b.dataset.value;
+      syncOptions();
+    });
+  });
+
   /* ---------------- input ---------------- */
 
   const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyQ', 'KeyE']);
@@ -999,6 +1132,7 @@
 
   window.addEventListener('keydown', e => {
     if (e.code === 'KeyM') { Grid.toggleMute(); return; }
+    if (e.code === 'KeyC') { toggleCam(); return; }
     if ((e.code === 'KeyP' || e.code === 'Escape') && (playing() || state === 'paused')) {
       togglePause(); e.preventDefault(); return;
     }
@@ -1013,30 +1147,44 @@
   window.addEventListener('blur', () => { keys.clear(); mouse.down = false; });
   document.addEventListener('visibilitychange', () => { if (document.hidden && playing()) togglePause(); });
 
-  function toGame(e) {
+  // Coordenadas na tela (para joystick e desenho) e no chão da arena (para mirar).
+  function screenPt(clientX, clientY) {
     const r = canvas.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+    return { x: (clientX - r.left) / r.width * W, y: (clientY - r.top) / r.height * H };
+  }
+  // Em 3D o ponto mirado depende da câmera, então é recalculado a cada frame.
+  function aimAt(src) {
+    if (is3d() && src.cx !== undefined) return r3d.pick(src.cx, src.cy) || src;
+    return src;
+  }
+  function setPointer(o, e) {
+    const s = screenPt(e.clientX, e.clientY);
+    o.cx = e.clientX; o.cy = e.clientY;
+    o.sx = s.x; o.sy = s.y;
+    o.x = s.x; o.y = s.y;
   }
 
   canvas.addEventListener('pointerdown', e => {
     Sfx.ensure();
-    const p = toGame(e);
+    const p = screenPt(e.clientX, e.clientY);
     if (e.pointerType === 'mouse') {
-      mouse.x = p.x; mouse.y = p.y; mouse.active = true;
+      setPointer(mouse, e);
+      mouse.active = true;
       if (e.button === 0) mouse.down = true;
     } else if (p.x < W / 2 && !joy) {
       joy = { id: e.pointerId, ox: p.x, oy: p.y, x: p.x, y: p.y };
     } else if (!touchAim) {
-      touchAim = { id: e.pointerId, x: p.x, y: p.y };
+      touchAim = { id: e.pointerId };
+      setPointer(touchAim, e);
     }
     canvas.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
   canvas.addEventListener('pointermove', e => {
-    const p = toGame(e);
-    if (e.pointerType === 'mouse') { mouse.x = p.x; mouse.y = p.y; mouse.active = true; return; }
+    if (e.pointerType === 'mouse') { setPointer(mouse, e); mouse.active = true; return; }
+    const p = screenPt(e.clientX, e.clientY);
     if (joy && joy.id === e.pointerId) { joy.x = p.x; joy.y = p.y; }
-    if (touchAim && touchAim.id === e.pointerId) { touchAim.x = p.x; touchAim.y = p.y; }
+    if (touchAim && touchAim.id === e.pointerId) setPointer(touchAim, e);
   });
   const release = e => {
     if (e.pointerType === 'mouse') { if (e.button === 0 || e.type === 'pointercancel') mouse.down = false; return; }
@@ -1049,7 +1197,11 @@
 
   /* ---------------- boot ---------------- */
 
-  function resize() { k = Grid.fit(canvas, W, H); if (map) buildBg(); }
+  function resize() {
+    k = Grid.fit(canvas, W, H, gameWrap);
+    if (map) buildBg();
+    if (r3d) r3d.resize(canvas.clientWidth || 1, canvas.clientHeight || 1);
+  }
   window.addEventListener('resize', resize);
   Grid.setupPads(stage, document.getElementById('padBtn'), resize);
 
@@ -1057,13 +1209,15 @@
   function frame(now) {
     const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
     last = now;
+    lastDt = dt;
     update(dt);
     render();
     requestAnimationFrame(frame);
   }
 
   Grid.bindMute(document.getElementById('muteBtn'));
-  k = Grid.fit(canvas, W, H);
+  syncOptions();
+  resize();
   startAttract();
   requestAnimationFrame(frame);
 })();
